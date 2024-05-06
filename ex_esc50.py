@@ -18,16 +18,6 @@ from helpers.utils import NAME_TO_WIDTH, exp_warmup_linear_down, mixup
 
 def train(args):
     # Train Models for Acoustic Scene Classification
-
-    # logging is done using wandb
-    wandb.init(
-        project="ESC50",
-        notes="Fine-tune Models on ESC50.",
-        tags=["Environmental Sound Classification", "Fine-Tuning"],
-        config=args,
-        name=args.experiment_name
-    )
-
     device = torch.device('cuda') if args.cuda and torch.cuda.is_available() else torch.device('cpu')
 
     # model to preprocess waveform into mel spectrograms
@@ -84,16 +74,17 @@ def train(args):
         exp_warmup_linear_down(args.warm_up_len, args.ramp_down_len, args.ramp_down_start, args.last_lr_value)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, schedule_lambda)
 
-    name = None
     accuracy, val_loss = float('NaN'), float('NaN')
+    train_losses, val_losses, val_accuracies = [], [], []
 
     for epoch in range(args.n_epochs):
         mel.train()
         model.train()
-        train_stats = dict(train_loss=list())
         pbar = tqdm(dl)
         pbar.set_description("Epoch {}/{}: accuracy: {:.4f}, val_loss: {:.4f}"
                              .format(epoch + 1, args.n_epochs, accuracy, val_loss))
+
+        training_loss_epoch = []
         for batch in pbar:
             x, f, y = batch
             bs = x.size(0)
@@ -118,7 +109,7 @@ def train(args):
             loss = samples_loss.mean()
 
             # append training statistics
-            train_stats['train_loss'].append(loss.detach().cpu().numpy())
+            training_loss_epoch.append(loss.detach().cpu().numpy())
 
             # Update Model
             loss.backward()
@@ -127,20 +118,30 @@ def train(args):
         # Update learning rate
         scheduler.step()
 
+        train_losses.append(np.mean(train_loss_epoch))
+
         # evaluate
-        accuracy, val_loss = _test(model, mel, eval_dl, device)
+        val_accuracy, val_loss = _test(model, mel, eval_dl, device)
+        val_losses.append(val_loss)
+        val_accuracies.append(val_accuracy)
 
-        # log train and validation statistics
-        wandb.log({"train_loss": np.mean(train_stats['train_loss']),
-                   "accuracy": accuracy,
-                   "val_loss": val_loss
-                   })
+    # Convert lists to numpy arrays after the training and validation loops
+    train_losses = np.array(train_losses)
+    val_losses = np.array(val_losses)
+    val_accuracies = np.array(val_accuracies)
 
-        # remove previous model (we try to not flood your hard disk) and save latest model
-        if name is not None:
-            os.remove(os.path.join(wandb.run.dir, name))
-        name = f"mn{str(width).replace('.', '')}_esc50_epoch_{epoch}_acc_{int(round(accuracy*1000))}.pt"
-        torch.save(model.state_dict(), os.path.join(wandb.run.dir, name))
+    # Save metrics to disk using np.save or np.savez
+    data_dir = '../drive/MyDrive/8321_Final_Project/models/data'
+    os.makedirs(data_dir, exist_ok=True)
+    np.savez(os.path.join(data_dir, 'training_metrics.npz'),
+             train_losses=train_losses,
+             val_losses=val_losses,
+             val_accuracies=val_accuracies)
+
+    # Save model
+    model_dir = '../drive/MyDrive/8321_Final_Project/models/model'
+    os.makedirs(model_dir, exist_ok=True)
+    torch.save(model, os.path.join(model_dir, "final_model.pth"))
 
 
 def _mel_forward(x, mel):
