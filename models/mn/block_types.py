@@ -23,15 +23,31 @@ class ConcurrentSEBlock(torch.nn.Module):
             squeeze_dim = make_divisible(input_dim // se_cnf['se_r'], 8)
             self.conc_se_layers.append(SqueezeExcitation(input_dim, squeeze_dim, d))
         if se_cnf['se_agg'] == "max":
-            self.agg_op = lambda x: torch.max(x, dim=0)[0]
+            self.agg_op = self.max_agg
         elif se_cnf['se_agg'] == "avg":
-            self.agg_op = lambda x: torch.mean(x, dim=0)
+            self.agg_op = self.avg_agg
         elif se_cnf['se_agg'] == "add":
-            self.agg_op = lambda x: torch.sum(x, dim=0)
+            self.agg_op = self.add_agg
         elif se_cnf['se_agg'] == "min":
-            self.agg_op = lambda x: torch.min(x, dim=0)[0]
+            self.agg_op = self.min_agg
         else:
             raise NotImplementedError(f"SE aggregation operation '{self.agg_op}' not implemented")
+
+    @staticmethod
+    def max_agg(x):
+        return torch.max(x, dim=0)[0]
+
+    @staticmethod
+    def avg_agg(x):
+        return torch.mean(x, dim=0)
+
+    @staticmethod
+    def add_agg(x):
+        return torch.sum(x, dim=0)
+
+    @staticmethod
+    def min_agg(x):
+        return torch.min(x, dim=0)[0]
 
     def forward(self, input: Tensor) -> Tensor:
         # apply all concurrent se layers
