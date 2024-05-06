@@ -74,7 +74,7 @@ def train(args):
         exp_warmup_linear_down(args.warm_up_len, args.ramp_down_len, args.ramp_down_start, args.last_lr_value)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, schedule_lambda)
 
-    accuracy, val_loss = float('NaN'), float('NaN')
+    val_accuracy, val_loss = float('NaN'), float('NaN')
     train_losses, val_losses, val_accuracies = [], [], []
 
     for epoch in range(args.n_epochs):
@@ -82,7 +82,7 @@ def train(args):
         model.train()
         pbar = tqdm(dl)
         pbar.set_description("Epoch {}/{}: accuracy: {:.4f}, val_loss: {:.4f}"
-                             .format(epoch + 1, args.n_epochs, accuracy, val_loss))
+                             .format(epoch + 1, args.n_epochs, val_accuracy, val_loss))
 
         training_loss_epoch = []
         for batch in pbar:
