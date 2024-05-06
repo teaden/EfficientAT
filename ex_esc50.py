@@ -118,7 +118,7 @@ def train(args):
         # Update learning rate
         scheduler.step()
 
-        train_losses.append(np.mean(train_loss_epoch))
+        train_losses.append(np.mean(training_loss_epoch))
 
         # evaluate
         val_accuracy, val_loss = _test(model, mel, eval_dl, device)
