@@ -86,13 +86,12 @@ class AudioSetDataset(TorchDataset):
     def __getitem__(self, index):
 
         filename = self.filenames[index]
-        full_filepath = os.path.join(self.audiopath, filename)
-        waveform, _ = librosa.load(full_filepath, sr=self.resample_rate, mono=True)
+        waveform, _ = librosa.load(filename, sr=self.resample_rate, mono=True)
 
         if self.gain_augment:
             waveform = pydub_augment(waveform, self.gain_augment)
         waveform = pad_or_truncate(waveform, self.clip_length)
-        return waveform.reshape(1, -1), full_filepath
+        return waveform.reshape(1, -1), filename
 
 
 def get_base_data_set(resample_rate=32000, gain_augment=0, source_link=''):
